@@ -3,14 +3,13 @@ from pathlib import Path
 import re
 
 # =========================
-# Paths
+# Paths (تعديل المسار ليكون ديناميكي فقط)
 # =========================
-input_path = Path(
-    r"\backend\Data\cleaned_data\unified_legal_schema.json"
-)
-output_path = Path(
-    r"\backend\Data\cleaned_data\unified_legal_schema_final.json"
-)
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+input_path = BASE_DIR / "Data" / "cleaned_data" / "unified_legal_schema.json"
+output_path = BASE_DIR / "Data" / "cleaned_data" / "unified_legal_schema_final.json"
+
 output_path.parent.mkdir(parents=True, exist_ok=True)
 
 # =========================
