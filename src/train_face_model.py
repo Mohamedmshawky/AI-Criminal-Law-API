@@ -5,10 +5,10 @@ from torchvision import datasets, models, transforms
 import os
 from pathlib import Path
 
-# 1. إعداد المسارات (تأكد من تعديل مسار الداتا للمسار عندك)
+# 1. إعداد المسارات (تعديل المسار ليكون ديناميكي فقط)
 BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_BASE_PATH = r"D:\real-vs-fake" # 👈 حط مسار الفولدر الرئيسي هنا
-SAVE_DIR = BASE_DIR / "data" / "Face_Models"
+DATA_BASE_PATH = BASE_DIR / "Data" / "real-vs-fake" 
+SAVE_DIR = BASE_DIR / "Data" / "Face_Models"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 # 2. التحويلات (نفس معايير الدقة 97%)
