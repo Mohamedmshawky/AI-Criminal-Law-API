@@ -6,19 +6,13 @@ import faiss
 import pickle
 
 # =========================
-# Paths
+# Paths (تعديل المسار ليكون ديناميكي فقط)
 # =========================
-input_path = Path(
-    r"D:\Users\moels\PycharmProjects\chat_1\backend\Data\cleaned_data\unified_legal_schema_final.json"
-)
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-faiss_index_path = Path(
-    r"\backend\Data\vector_db\faiss_index_muffakir.bin"
-)
-
-metadata_path = Path(
-    r"\backend\Data\vector_db\metadata_muffakir.pkl"
-)
+input_path = BASE_DIR / "Data" / "cleaned_data" / "unified_legal_schema_final.json"
+faiss_index_path = BASE_DIR / "Data" / "vector_db" / "faiss_index_muffakir.bin"
+metadata_path = BASE_DIR / "Data" / "vector_db" / "metadata_muffakir.pkl"
 
 faiss_index_path.parent.mkdir(parents=True, exist_ok=True)
 
