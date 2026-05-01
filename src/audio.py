@@ -13,14 +13,23 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from pydub import AudioSegment
+from pathlib import Path
 
-# 1. تحديد المسار المحلي للفولدر (غير المسار ده لمكان الفولدر عندك على D:)
-folder_path = r"D:\Users\moels\PycharmProjects\chat_1\backend\data\Arabic_Audio_Deepfake"
+# ================= PATHS (Dynamic Setup) =================
+# BASE_DIR هنا هي الفولدر الرئيسي للبروجيكت (backend)
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-# 2. تحميل البيانات
-train_path = os.path.join(folder_path, "train-00000-of-00003.parquet")
-df_train = pd.read_parquet(train_path)
+# تحديد مسار فولدر الداتا بشكل نسبي
+folder_path = BASE_DIR / "Data" / "Arabic_Audio_Deepfake"
 
+# تحميل البيانات (استخدام الـ Path بيضمن إن المسار يشتغل على أي OS)
+train_path = folder_path / "train-00000-of-00003.parquet"
+
+# ================= 2. تحميل البيانات =================
+if not train_path.exists():
+    print(f"❌ Error: File not found at {train_path}")
+else:
+    df_train = pd.read_parquet(str(train_path))
 
 def extract_mfcc_from_file(audio_path, n_mfcc=13):
     waveform, sr = sf.read(audio_path)
@@ -33,8 +42,7 @@ def extract_mfcc_from_file(audio_path, n_mfcc=13):
     mfcc_mean = np.mean(mfcc, axis=1)
     return mfcc_mean
 
-
-# 3. استخراج الميزات (Features)
+# ================= 3. استخراج الميزات (Features) =================
 X, y = [], []
 for i in tqdm(range(len(df_train))):
     try:
@@ -55,7 +63,7 @@ for i in tqdm(range(len(df_train))):
 
 X, y = np.array(X), np.array(y)
 
-# 4. التدريب
+# ================= 4. التدريب =================
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
@@ -64,7 +72,10 @@ X_test_scaled = scaler.transform(X_test)
 model = RandomForestClassifier(n_estimators=100, random_state=42)
 model.fit(X_train_scaled, y_train)
 
-# 5. حفظ الموديل
-joblib.dump(model, "audio_rf_model.pkl")
-joblib.dump(scaler, "audio_scaler.pkl")
-print("✅ Model and scaler saved successfully!")
+# ================= 5. حفظ الموديل =================
+# الحفظ هيتم جوه فولدر src عشان الـ api.py بيقرأهم من هناك
+save_dir = BASE_DIR / "src"
+joblib.dump(model, save_dir / "audio_rf_model.pkl")
+joblib.dump(scaler, save_dir / "audio_scaler.pkl")
+
+print(f"✅ Model and scaler saved successfully in {save_dir}!")
