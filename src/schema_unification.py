@@ -2,12 +2,12 @@ import json
 from pathlib import Path
 
 # =========================
-# Paths
+# Paths (تعديل المسار ليكون ديناميكي فقط)
 # =========================
-INPUT_DIR = Path(r"\backend\Data\json_data")
-OUTPUT_PATH = Path(
-    r"\backend\Data\cleaned_data\unified_legal_schema.json"
-)
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+INPUT_DIR = BASE_DIR / "Data" / "json_data"
+OUTPUT_PATH = BASE_DIR / "Data" / "cleaned_data" / "unified_legal_schema.json"
 
 # =========================
 # Utils
