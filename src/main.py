@@ -2,6 +2,7 @@ import faiss
 import pickle
 import numpy as np
 import torch
+import os
 from pathlib import Path
 from collections import defaultdict
 from sentence_transformers import SentenceTransformer
@@ -9,15 +10,24 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 import streamlit as st
 
 # =========================
-# Paths
+# Paths (Dynamic Setup)
 # =========================
-VECTOR_DB_PATH = Path(r"\backend\Data\vector_db\faiss_index_muffakir.bin")
-METADATA_PATH  = Path(r"\backend\Data\vector_db\metadata_muffakir.pkl")
+# BASE_DIR هنا هي الفولدر الرئيسي للبروجيكت (backend)
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# تحديد مسارات الـ Vector DB بشكل نسبي
+VECTOR_DB_PATH = BASE_DIR / "Data" / "vector_db" / "faiss_index_muffakir.bin"
+METADATA_PATH  = BASE_DIR / "Data" / "vector_db" / "metadata_muffakir.pkl"
+
 # =========================
 # Load FAISS + Metadata
 # =========================
 @st.cache_resource
 def load_vector_db():
+    # التأكد من وجود الملفات قبل التحميل لتجنب الـ Crash
+    if not VECTOR_DB_PATH.exists():
+        raise FileNotFoundError(f"❌ لم يتم العثور على ملف Index في: {VECTOR_DB_PATH}")
+    
     index = faiss.read_index(str(VECTOR_DB_PATH))
     with open(METADATA_PATH, "rb") as f:
         metadata = pickle.load(f)
@@ -28,6 +38,7 @@ def load_vector_db():
 # =========================
 @st.cache_resource
 def load_embedding_model():
+    # الموديل هيتحمل أوتوماتيك من Hugging Face Hub عند أول تشغيل
     return SentenceTransformer("mohamed2811/Muffakir_Embedding", device="cpu")
 
 # =========================
@@ -52,15 +63,16 @@ def load_generation_model(model_choice):
                         temperature=0.0)
 
     else:
+        # ملاحظة: Ollama يحتاج تنصيب منفصل على السيرفر، 
+        # في Hugging Face يفضل استخدام الاستدعاء من Transformers مباشرة
         from langchain_community.llms import Ollama
         return Ollama(model=model_choice,
-                    temperature=0.3,top_p= 0.1,
-                    num_predict= 600
+                    temperature=0.3, top_p=0.1,
+                    num_predict=600
                      )
 
-# =========================
-# Embedding & Intent
-# =========================
+# [باقي الدوال: embed_text, infer_intent, retrieve_candidates, filter_by_intent, group_by_article, build_legal_context, generate_answer تظل كما هي بدون تغيير]
+
 def embed_text(text, model):
     return model.encode(text, convert_to_numpy=True, normalize_embeddings=True)
 
@@ -74,9 +86,6 @@ def infer_intent(question: str) -> str:
         return "procedure"
     return "general"
 
-# =========================
-# Retrieval
-# =========================
 def retrieve_candidates(query, index, metadata, emb_model, top_n=30):
     q_vec = embed_text(query, emb_model)
     scores, ids = index.search(np.array([q_vec], dtype=np.float32), min(top_n, index.ntotal))
@@ -89,18 +98,12 @@ def retrieve_candidates(query, index, metadata, emb_model, top_n=30):
     results.sort(key=lambda x: x["_score"], reverse=True)
     return results
 
-# =========================
-# Filter by Intent
-# =========================
 def filter_by_intent(results, intent):
     if intent == "penalty":
         filtered = [r for r in results if r.get("topic") == "penalty"]
         return filtered if filtered else results[:10]
     return results[:10]
 
-# =========================
-# Group by Article
-# =========================
 def group_by_article(chunks):
     grouped = defaultdict(list)
     for c in chunks:
@@ -115,9 +118,6 @@ def group_by_article(chunks):
         })
     return articles
 
-# =========================
-# Build Context
-# =========================
 def build_legal_context(articles, max_chars=1800):
     context = ""
     for art in articles:
@@ -127,9 +127,6 @@ def build_legal_context(articles, max_chars=1800):
         context += block
     return context
 
-# =========================
-# Generate Answer with Guard
-# =========================
 def generate_answer(generator, context, question, sources):
     prompt = f"""
 أنت مساعد قانوني مصري.
@@ -159,7 +156,6 @@ def generate_answer(generator, context, question, sources):
                 else:
                     answer = str(out)
             else:
-                # Ollama LLM
                 answer = generator.invoke(prompt)
     except Exception as e:
             answer = f"❌ خطأ أثناء التوليد: {str(e)}"
@@ -167,37 +163,44 @@ def generate_answer(generator, context, question, sources):
     return answer
 
 # =========================
-# Streamlit UI
+# Streamlit UI (تعديل طفيف للتوافق مع السيرفر)
 # =========================
-st.set_page_config(page_title="⚖️ المساعد القانوني المصري", layout="wide")
-st.title("⚖️ المساعد القانوني المصري")
-st.markdown("<center style='color:gray'>مشروع تخرج – جامعة القاهرة</center>", unsafe_allow_html=True)
+if __name__ == "__main__" or "streamlit" in os.environ.get("_", ""):
+    st.set_page_config(page_title="⚖️ المساعد القانوني المصري", layout="wide")
+    st.title("⚖️ المساعد القانوني المصري")
+    st.markdown("<center style='color:gray'>مشروع تخرج – جامعة القاهرة</center>", unsafe_allow_html=True)
 
-index, metadata = load_vector_db()
-emb_model = load_embedding_model()
-model_choice = st.selectbox(
-    "🤖 اختر نموذج الإجابة:",
-    ["qwen", "gemma3:4b", "llama3:8b"]
-)
+    try:
+        index, metadata = load_vector_db()
+        emb_model = load_embedding_model()
+        
+        model_choice = st.selectbox(
+            "🤖 اختر نموذج الإجابة:",
+            ["qwen", "gemma3:4b", "llama3:8b"]
+        )
 
-gen_model = load_generation_model(model_choice)
+        gen_model = load_generation_model(model_choice)
 
-query = st.text_area("📝 اكتب سؤالك القانوني:", height=100)
-if st.button("📨 إرسال"):
-    if query.strip():
-        with st.spinner("🔍 جاري التحليل القانوني..."):
-            intent = infer_intent(query)
-            candidates = retrieve_candidates(query, index, metadata, emb_model)
-            filtered = filter_by_intent(candidates, intent)
-            articles = group_by_article(filtered)
-            context = build_legal_context(articles)
-            answer = generate_answer(gen_model, context, query, articles)
-        st.subheader("📌 الإجابة القانونية")
-        st.markdown(f"<div class='answer-box'>{answer}</div>", unsafe_allow_html=True)
-        if articles:
-            st.subheader("📚 النصوص المستخدمة")
-            for src in articles:
-                with st.expander(f"{src['law_name']} – {src['article_number']}"):
-                    st.write(src["text"])
-    else:
-        st.error("❌ برجاء كتابة سؤال")
+        query = st.text_area("📝 اكتب سؤالك القانوني:", height=100)
+        if st.button("📨 إرسال"):
+            if query.strip():
+                with st.spinner("🔍 جاري التحليل القانوني..."):
+                    intent = infer_intent(query)
+                    candidates = retrieve_candidates(query, index, metadata, emb_model)
+                    filtered = filter_by_intent(candidates, intent)
+                    articles = group_by_article(filtered)
+                    context = build_legal_context(articles)
+                    answer = generate_answer(gen_model, context, query, articles)
+                
+                st.subheader("📌 الإجابة القانونية")
+                st.markdown(f"<div style='padding:15px; border-radius:10px; background-color:#f0f2f6;'>{answer}</div>", unsafe_allow_html=True)
+                
+                if articles:
+                    st.subheader("📚 النصوص المستخدمة")
+                    for src in articles:
+                        with st.expander(f"{src['law_name']} – {src['article_number']}"):
+                            st.write(src["text"])
+            else:
+                st.error("❌ برجاء كتابة سؤال")
+    except Exception as e:
+        st.error(f"⚠️ حدث خطأ في تحميل النظام: {str(e)}")
