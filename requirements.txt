@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+python-multipart
+tensorflow
+torch
+torchvision
+sentence-transformers
+faiss-cpu
+librosa
+joblib
+pandas
+numpy
+scikit-learn
+Pillow
+google-generativeai
